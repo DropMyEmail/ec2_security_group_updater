@@ -1,49 +1,37 @@
 require 'spec_helper'
 require 'ec2_security_group_updater'
+require 'security_group'
 
 describe Ec2SecurityGroupUpdater do
-  before do
-    config = AWS::Core::Configuration.new({
-        stub_requests: true,
-        access_key_id: 'ACCESS_KEY_ID',
-        secret_access_key: 'SECRET_ACCESS_KEY',
-        session_token: 'SESSION_TOKEN'
-    })
+  let(:ec2_security_group_updater) {
+    Ec2SecurityGroupUpdater.new(
+        access_key_id: 'AKIAJY3HZOC46JLTLT2A',
+        secret_access_key: '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',
+        region: 'ap-southeast-1',
+        group_name: 'database-servers'
+    )
+  }
 
-    # stub(AWS).config.with_any_args { config }
-    # stub(AWS::EC2).new { @ec2 }
-    # stub(@ec2).security_groups.stub!.filter.with_any_args { [] }
-  end
+  let(:security_group) {
+    SecurityGroup.new(
+        access_key_id: 'AKIAJY3HZOC46JLTLT2A',
+        secret_access_key: '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',
+        region: "ap-southeast-1",
+        group_name: 'database-servers'
+    )
+  }
 
-  describe '#update_security_group_ip_permissions' do
-    context 'with valid arguments' do
-      it 'returns true'
-      it 'updates the group ip permission'
-    end
+  describe '#change_permissions_ip_address' do
+    context 'when update success with no exception' do
+      it 'returns true' do
+        expect(ec2_security_group_updater.change_permissions_ip_address('40.40.40.40/32', '41.41.41.41/32')).to eql true
+      end
 
-    context 'with invalid arguments' do
-      it 'returns false'
-      it 'doesnt change the group ip permission'
-    end
-  end
-
-  describe '#get_port_range_by_protocol' do
-    context 'with valid security_group passed' do
-      it 'returns protocol and port range with ip 100.100.100.100/32'
-    end
-  end
-
-  describe '#create_new_permission' do
-    it 'creates new ip permission 200.200.200.200/32 with the given port range and protocol'
-  end
-
-  describe '#delete_old_permission' do
-    it 'deletes ip permission 100.100.100.100/32 with the given port range and protocol'
-  end
-
-  describe '#ec2' do
-    it "returns the correct ec2 instance based on the region" do
-      ec2('us-virginia')
+      it 'does not allow to create new permission with the same new ip' do
+        security_group.create_permission_for_ip({ protocol: 'tcp', from: 9006, to: 9010 }, '42.42.42.42/32')
+        ec2_security_group_updater.change_permissions_ip_address('42.42.42.42/32', '43.43.43.43/32')
+        expect{ security_group.create_permission_for_ip({ protocol: 'tcp', from: 9006, to: 9010 }, '43.43.43.43/32') }.to raise_error(AWS::EC2::Errors::InvalidPermission::Duplicate)
+      end
     end
   end
 end
